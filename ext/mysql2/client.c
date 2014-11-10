@@ -30,12 +30,6 @@ static VALUE rb_hash_dup(VALUE other) {
     rb_raise(cMysql2Error, "MySQL client is not initialized"); \
   }
 
-#define REQUIRE_CONNECTED(wrapper) \
-  REQUIRE_INITIALIZED(wrapper) \
-  if (!wrapper->connected && !wrapper->reconnect_enabled) { \
-    rb_raise(cMysql2Error, "closed MySQL connection"); \
-  }
-
 #define REQUIRE_NOT_CONNECTED(wrapper) \
   REQUIRE_INITIALIZED(wrapper) \
   if (wrapper->connected) { \
@@ -44,10 +38,6 @@ static VALUE rb_hash_dup(VALUE other) {
 
 #define MARK_CONN_INACTIVE(conn) \
   wrapper->active_thread = Qnil;
-
-#define GET_CLIENT(self) \
-  mysql_client_wrapper *wrapper; \
-  Data_Get_Struct(self, mysql_client_wrapper, wrapper)
 
 /*
  * compatability with mysql-connector-c, where LIBMYSQL_VERSION is the correct
@@ -1220,6 +1210,17 @@ static VALUE initialize_ext(VALUE self) {
   return self;
 }
 
+/* call-seq: client.prepare # => Mysql2::Statement
+ *
+ * Create a new prepared statement.
+ */
+static VALUE rb_mysql_client_prepare_statement(VALUE self, VALUE sql) {
+  GET_CLIENT(self);
+  REQUIRE_CONNECTED(wrapper);
+
+  return rb_mysql_stmt_new(self, sql);
+}
+
 void init_mysql2_client() {
   /* verify the libmysql we're about to use was the version we were built against
      https://github.com/luislavena/mysql-gem/commit/a600a9c459597da0712f70f43736e24b484f8a99 */
@@ -1265,6 +1266,7 @@ void init_mysql2_client() {
   rb_define_method(cMysql2Client, "async_result", rb_mysql_client_async_result, 0);
   rb_define_method(cMysql2Client, "last_id", rb_mysql_client_last_id, 0);
   rb_define_method(cMysql2Client, "affected_rows", rb_mysql_client_affected_rows, 0);
+  rb_define_method(cMysql2Client, "prepare", rb_mysql_client_prepare_statement, 1);
   rb_define_method(cMysql2Client, "thread_id", rb_mysql_client_thread_id, 0);
   rb_define_method(cMysql2Client, "ping", rb_mysql_client_ping, 0);
   rb_define_method(cMysql2Client, "select_db", rb_mysql_client_select_db, 1);
